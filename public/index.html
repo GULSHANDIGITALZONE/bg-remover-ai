@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Free Background Remover</title>
+</head>
+<body>
+
+<h2>Free Background Remover (AI)</h2>
+
+<input type="file" id="file">
+<button onclick="remove()">Remove Background</button>
+<br><br>
+<img id="img" width="300">
+<br>
+<button onclick="download()">Download</button>
+
+<script>
+let blobData;
+const BACKEND_URL =
+  "https://bg-remover-ai-b8ul.onrender.com/remove-bg";
+
+function remove(){
+  const file = document.getElementById("file").files[0];
+  const form = new FormData();
+  form.append("image", file);
+
+  fetch(BACKEND_URL,{
+    method:"POST",
+    body:form
+  })
+  .then(r=>r.blob())
+  .then(b=>{
+    blobData=b;
+    document.getElementById("img").src=URL.createObjectURL(b);
+  });
+}
+
+function download(){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blobData);
+  a.download="bg_removed.png";
+  a.click();
+}
+</script>
+
+</body>
+</html>
