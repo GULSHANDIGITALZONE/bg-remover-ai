@@ -1,64 +1,56 @@
-const express = require("express");
-const multer = require("multer");
-const axios = require("axios");
-const cors = require("cors");
-const FormData = require("form-data");
+import express from "express";
+import cors from "cors";
+import multer from "multer";
+import fetch from "node-fetch";
+import FormData from "form-data";
 
 const app = express();
 app.use(cors());
 
-// ✅ VERY IMPORTANT: memoryStorage
-const storage = multer.memoryStorage();
-
+// memory storage
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 // health check
 app.get("/", (req, res) => {
-  res.send("BG Remover Backend Running");
+  res.send("FREE AI Background Remover Running");
 });
 
-// remove background
+// remove background using HuggingFace RMBG
 app.post("/remove-bg", upload.single("image"), async (req, res) => {
   try {
-    if (!req.file || !req.file.buffer) {
-      return res.status(400).json({ error: "Image buffer not found" });
+    if (!req.file) {
+      return res.status(400).json({ error: "No image uploaded" });
     }
 
-    const formData = new FormData();
-    formData.append(
-      "image_file",
-      req.file.buffer,
-      req.file.originalname
-    );
-    formData.append("size", "auto");
+    const form = new FormData();
+    form.append("image", req.file.buffer, {
+      filename: req.file.originalname
+    });
 
-    const response = await axios.post(
-      "https://api.remove.bg/v1.0/removebg",
-      formData,
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/briaai/RMBG-1.4",
       {
-        headers: {
-          ...formData.getHeaders(),
-          "X-Api-Key": process.env.REMOVE_BG_KEY
-        },
-        responseType: "arraybuffer",
-        timeout: 60000
+        method: "POST",
+        body: form
       }
     );
 
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Content-Disposition", "inline; filename=bg.png");
-    res.send(response.data);
+    res.send(buffer);
 
   } catch (err) {
-    console.error("REMOVE.BG ERROR:", err.response?.data || err.message);
-
-    res.status(500).json({
-      error: "Background remove failed",
-      details: err.response?.data || err.message
-    });
+    console.error(err.message);
+    res.status(500).json({ error: "Background remove failed" });
   }
 });
 
